@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Minus, Star, MessageSquare, Award, Zap, Users, BarChart3, Trophy, Target, Sparkles, ChevronUp } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './Home.css';
 
 const Home = () => {
@@ -13,6 +13,43 @@ const Home = () => {
         todayCount: 0,
         points: 0
     });
+
+    // 주차별 데이터 생성 함수
+    const generateWeeklyData = () => {
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+
+        // 이번달 첫날과 오늘까지의 주차 계산
+        const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+        const currentWeek = Math.ceil((today.getDate() + firstDayOfMonth.getDay()) / 7);
+
+        // 저번달 데이터 (완전한 4주)
+        const lastMonthData = [
+            { lastMonth: Math.floor(Math.random() * 6) + 2 },
+            { lastMonth: Math.floor(Math.random() * 7) + 3 },
+            { lastMonth: Math.floor(Math.random() * 8) + 4 },
+            { lastMonth: Math.floor(Math.random() * 9) + 5 }
+        ];
+
+        // 이번달 4주차까지의 데이터 생성
+        const thisMonthData = [];
+        for (let i = 1; i <= 4; i++) {
+            const baseData = lastMonthData[i - 1];
+            thisMonthData.push({
+                week: `${i}주차`,
+                // 현재 주차까지만 thisMonth 데이터 포함, 이후는 null
+                thisMonth: i <= currentWeek ?
+                    (i === currentWeek ?
+                            Math.floor(Math.random() * 5) + 2 : // 현재 주차는 진행중이므로 낮게
+                            Math.floor(Math.random() * 10) + 5  // 완료된 주차
+                    ) : null, // null로 설정하면 해당 부분에 선이 그어지지 않음
+                lastMonth: baseData.lastMonth
+            });
+        }
+
+        return thisMonthData;
+    };
 
     const data = {
         monthAnalyze: {
@@ -34,13 +71,7 @@ const Home = () => {
             group2Growth: "0",
             group3Growth: "+1"
         },
-        weeklyData: [
-            { day: '월', count: 4 },
-            { day: '화', count: 5 },
-            { day: '수', count: 3 },
-            { day: '목', count: 0 }, // 오늘이 수요일이므로 목금은 0건
-            { day: '금', count: 0 }
-        ],
+        weeklyData: generateWeeklyData(),
         monthlyData: (() => {
             const today = new Date();
             const currentDay = today.getDate();
@@ -144,13 +175,6 @@ const Home = () => {
         return <Minus className="growth-icon neutral" />;
     };
 
-    // X축 간격 계산 함수
-    const getXAxisInterval = (dataLength) => {
-        if (dataLength <= 10) return 0; // 10일 이하면 모든 라벨 표시
-        if (dataLength <= 20) return 1; // 11-20일이면 2일마다 표시
-        return 2; // 21일 이상이면 3일마다 표시
-    };
-
     const dailyProgress = Math.min((animatedValues.todayCount / data.currentAnalyze.totalCount) * 100 * 8, 100); // 일일 넛지율 기반
 
     // 등급 시스템
@@ -180,6 +204,28 @@ const Home = () => {
         console.log(`북마크 토글: ${storyId}`);
     };
 
+    // 커스텀 툴팁 컴포넌트
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="custom-tooltip">
+                    <p className="tooltip-label">{`${label}`}</p>
+                    {payload.map((entry, index) => (
+                        <p key={index} className="tooltip-value" style={{ color: entry.color }}>
+                            {`${entry.name === 'thisMonth' ? '이번달' : '저번달'}: ${entry.value}건`}
+                        </p>
+                    ))}
+                </div>
+            );
+        }
+        return null;
+    };
+
+    // 월별 총합 계산
+    const thisMonthTotal = data.weeklyData.reduce((sum, week) => sum + week.thisMonth, 0);
+    const lastMonthTotal = data.weeklyData.reduce((sum, week) => sum + week.lastMonth, 0);
+    const monthComparison = thisMonthTotal - lastMonthTotal;
+
     return (
         <div className="dashboard">
             <div className="dashboard-container">
@@ -189,13 +235,11 @@ const Home = () => {
                         <h1>안녕하세요, <span className="highlight">김상담님</span> 👋</h1>
                         <p>오늘도 좋은 하루 되세요!</p>
                     </div>
-                    <div className="success-notification">
-                        <div className="notification-content">
-                            <div className="notification-header">
-                                <span className="consultant-name">박상담님</span>이 성공했습니다
-                            </div>
-                            <div className="success-message">
-                                "고객님의 현재 요금제를 분석해보니 GIGA로 바꾸시면 월 2만원 절약하실 수 있어요"
+                    <div className="team-ranking">
+                        <div className="ranking-content">
+                            <div className="team-info">
+                                <span className="team-name">마케팅1팀</span>
+                                <span className="team-rank">현재 전체 3위</span>
                             </div>
                         </div>
                     </div>
@@ -209,6 +253,108 @@ const Home = () => {
                     </div>
 
                     <div className="kpi-grid">
+                        {/* 전환 현황 & 어제 성과 통합 */}
+                        <div className="kpi-card conversion-performance">
+                            <div className="card-header">
+                                <BarChart3 className="icon" />
+                                <span>전환 현황 & 어제 성과</span>
+                            </div>
+
+                            {/* 어제 성과 요약 */}
+                            <div className="yesterday-summary">
+                                <div className="performance-stats">
+                                    <div className="stat-item">
+                                        <div className="stat-value highlight">{animatedValues.todayCount}</div>
+                                        <div className="stat-label">어제 넛지 성공</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="stat-value">{data.currentAnalyze.nudgePercentage}%</div>
+                                        <div className="stat-label">성공률</div>
+                                    </div>
+                                    <div className="trend-info positive">
+                                        <TrendingUp className="icon" />
+                                        <span>전일 대비 +{data.currentAnalyze.nudgeCount}건</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 전환 현황 */}
+                            <div className="conversion-section">
+                                <div className="section-subtitle">
+                                    <span>📊 상품별 전환 현황</span>
+                                </div>
+                                <div className="conversion-grid">
+                                    <div className="conversion-item">
+                                        <div className="value pink">{data.currentAnalyze.gourp1Count}</div>
+                                        <div className="label">GIGA</div>
+                                        <div className="growth">
+                                            {getGrowthIcon(data.currentAnalyze.group1Growth)}
+                                            <span>{data.currentAnalyze.group1Growth}</span>
+                                        </div>
+                                        <div className="conversion-rate">전환률 4.2%</div>
+                                    </div>
+                                    <div className="conversion-item">
+                                        <div className="value blue">{data.currentAnalyze.gourp2Count}</div>
+                                        <div className="label">CRM</div>
+                                        <div className="growth">
+                                            {getGrowthIcon(data.currentAnalyze.group2Growth)}
+                                            <span>유지</span>
+                                        </div>
+                                        <div className="conversion-rate">전환률 3.1%</div>
+                                    </div>
+                                    <div className="conversion-item">
+                                        <div className="value green">{data.currentAnalyze.gourp3Count}</div>
+                                        <div className="label">TDS</div>
+                                        <div className="growth">
+                                            {getGrowthIcon(data.currentAnalyze.group3Growth)}
+                                            <span>{data.currentAnalyze.group3Growth}</span>
+                                        </div>
+                                        <div className="conversion-rate">전환률 2.8%</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 이번주 일별 성과 - 컴팩트 버전 */}
+                            <div className="weekly-performance-compact">
+                                <div className="performance-header">
+                                    <span className="performance-title">📈 이번주</span>
+                                </div>
+                                <div className="daily-grid-compact">
+                                    <div className="daily-item-compact">
+                                        <div className="day-compact">월</div>
+                                        <div className="day-value-compact">4</div>
+                                    </div>
+                                    <div className="daily-item-compact">
+                                        <div className="day-compact">화</div>
+                                        <div className="day-value-compact">5</div>
+                                    </div>
+                                    <div className="daily-item-compact">
+                                        <div className="day-compact">수</div>
+                                        <div className="day-value-compact">3</div>
+                                    </div>
+                                    <div className="daily-item-compact today">
+                                        <div className="day-compact">목</div>
+                                        <div className="day-value-compact">{animatedValues.todayCount}</div>
+                                    </div>
+                                    <div className="daily-item-compact future">
+                                        <div className="day-compact">금</div>
+                                        <div className="day-value-compact">-</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* AI 응원 멘트 */}
+                            <div className="ai-encouragement">
+                                <div className="ai-avatar">🤖</div>
+                                <div className="encouragement-content">
+                                    <div className="encouragement-text">
+                                        "어제보다 더 좋은 성과를 보이고 계시네요! 특히 GIGA 전환률이 높아지고 있어 인상적입니다. 이런 추세라면 이번 달 목표 달성도 충분히 가능해 보입니다. 파이팅! 💪"
+                                    </div>
+                                    <div className="ai-signature">- AI 어시스턴트</div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* 넛지율 */}
                         <div className="kpi-card nudge-rate">
                             <div className="card-header">
@@ -262,49 +408,124 @@ const Home = () => {
                                             <div className="progress-fill" style={{ width: '85%' }}></div>
                                         </div>
                                     </div>
+
+                                    {/* 성과 하이라이트 추가 */}
+                                    <div className="performance-highlights">
+                                        <div className="highlight-title">🏆 이번달 하이라이트</div>
+                                        <div className="highlight-list">
+                                            <div className="highlight-item">
+                                                <span className="highlight-icon">🥇</span>
+                                                <span className="highlight-text">주간 1위 달성 (3주차)</span>
+                                            </div>
+                                            <div className="highlight-item">
+                                                <span className="highlight-icon">📈</span>
+                                                <span className="highlight-text">전월 대비 +15% 성장</span>
+                                            </div>
+                                            <div className="highlight-item">
+                                                <span className="highlight-icon">⭐</span>
+                                                <span className="highlight-text">고객만족도 4.8/5.0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 스킬 분석 추가 */}
+                                    <div className="skill-analysis">
+                                        <div className="skill-title">💪 상담 스킬 분석</div>
+                                        <div className="skill-items">
+                                            <div className="skill-item">
+                                                <div className="skill-info">
+                                                    <span className="skill-name">니즈 파악</span>
+                                                    <span className="skill-score">92%</span>
+                                                </div>
+                                                <div className="skill-bar">
+                                                    <div className="skill-fill" style={{ width: '92%' }}></div>
+                                                </div>
+                                            </div>
+                                            <div className="skill-item">
+                                                <div className="skill-info">
+                                                    <span className="skill-name">제안 타이밍</span>
+                                                    <span className="skill-score">87%</span>
+                                                </div>
+                                                <div className="skill-bar">
+                                                    <div className="skill-fill" style={{ width: '87%' }}></div>
+                                                </div>
+                                            </div>
+                                            <div className="skill-item">
+                                                <div className="skill-info">
+                                                    <span className="skill-name">설득력</span>
+                                                    <span className="skill-score">89%</span>
+                                                </div>
+                                                <div className="skill-bar">
+                                                    <div className="skill-fill" style={{ width: '89%' }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* 한달 넛지건수 그래프 */}
+                                {/* 주차별 넛지건수 그래프 */}
                                 <div className="monthly-chart">
                                     <div className="chart-header">
-                                        <span className="chart-title">한달 넛지 성공 건수</span>
-                                        <span className="chart-trend">📊 총 {data.monthlyData.reduce((sum, item) => sum + item.count, 0)}건</span>
+                                        <span className="chart-title">주차별 넛지 성공 비교</span>
+                                        <div className="chart-trend">
+                                            <span className="this-month-total">이번달: {thisMonthTotal}건</span>
+                                            <span className={`month-comparison ${monthComparison >= 0 ? 'positive' : 'negative'}`}>
+                                                {monthComparison >= 0 ? '+' : ''}{monthComparison}건
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="chart-container">
-                                        <ResponsiveContainer width="100%" height={220}>
-                                            <LineChart data={data.monthlyData} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                        <ResponsiveContainer width="100%" height={240}>
+                                            <LineChart data={data.weeklyData} margin={{ left: 5, right: 5, top: 5, bottom: 5 }}>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                                 <XAxis
-                                                    dataKey="date"
+                                                    dataKey="week"
                                                     stroke="#6b7280"
                                                     fontSize={11}
                                                     tickLine={false}
                                                     axisLine={false}
-                                                    interval={getXAxisInterval(data.monthlyData.length)}
                                                 />
                                                 <YAxis
                                                     stroke="#6b7280"
                                                     fontSize={11}
                                                     tickLine={false}
                                                     axisLine={false}
-                                                    domain={[0, 10]}
-                                                    ticks={[0, 2, 4, 6, 8, 10]}
-                                                    width={30}
+                                                    domain={[0, 15]}
+                                                    width={25}
                                                 />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor: '#ffffff',
-                                                        border: '1px solid #e5e7eb',
-                                                        borderRadius: '8px',
-                                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                                                <Tooltip content={<CustomTooltip />} />
+                                                <Legend
+                                                    wrapperStyle={{
+                                                        fontSize: '11px',
+                                                        paddingTop: '8px'
                                                     }}
-                                                    labelStyle={{ color: '#374151', fontWeight: '600' }}
                                                 />
                                                 <Line
-                                                    type="natural"
-                                                    dataKey="count"
-                                                    stroke="url(#lineGradient)"
+                                                    type="monotone"
+                                                    dataKey="lastMonth"
+                                                    stroke="#9ca3af"
+                                                    strokeWidth={3}
+                                                    strokeDasharray="8 4"
+                                                    name="저번달"
+                                                    dot={{
+                                                        fill: '#9ca3af',
+                                                        stroke: '#ffffff',
+                                                        strokeWidth: 2,
+                                                        r: 4
+                                                    }}
+                                                    activeDot={{
+                                                        r: 6,
+                                                        stroke: '#9ca3af',
+                                                        strokeWidth: 2,
+                                                        fill: '#ffffff'
+                                                    }}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="thisMonth"
+                                                    stroke="#3b82f6"
                                                     strokeWidth={4}
+                                                    name="이번달"
                                                     dot={{
                                                         fill: '#3b82f6',
                                                         stroke: '#ffffff',
@@ -320,112 +541,10 @@ const Home = () => {
                                                         filter: 'drop-shadow(0 4px 8px rgba(59, 130, 246, 0.4))'
                                                     }}
                                                 />
-                                                <defs>
-                                                    <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                                                        <stop offset="0%" stopColor="#3b82f6" />
-                                                        <stop offset="50%" stopColor="#60a5fa" />
-                                                        <stop offset="100%" stopColor="#3b82f6" />
-                                                    </linearGradient>
-                                                </defs>
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* 전환 현황 & 어제 성과 통합 */}
-                        <div className="kpi-card conversion-performance">
-                            <div className="card-header">
-                                <BarChart3 className="icon" />
-                                <span>전환 현황 & 어제 성과</span>
-                            </div>
-
-                            {/* 어제 성과 요약 */}
-                            <div className="yesterday-summary">
-                                <div className="performance-stats">
-                                    <div className="stat-item">
-                                        <div className="stat-value highlight">{animatedValues.todayCount}</div>
-                                        <div className="stat-label">어제 넛지 성공</div>
-                                    </div>
-                                    <div className="stat-item">
-                                        <div className="stat-value">{data.currentAnalyze.nudgePercentage}%</div>
-                                        <div className="stat-label">성공률</div>
-                                    </div>
-                                    <div className="trend-info positive">
-                                        <TrendingUp className="icon" />
-                                        <span>전일 대비 +{data.currentAnalyze.nudgeCount}건</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 전환 현황 */}
-                            <div className="conversion-grid">
-                                <div className="conversion-item">
-                                    <div className="value pink">{data.currentAnalyze.gourp1Count}</div>
-                                    <div className="label">GIGA</div>
-                                    <div className="growth">
-                                        {getGrowthIcon(data.currentAnalyze.group1Growth)}
-                                        <span>{data.currentAnalyze.group1Growth}</span>
-                                    </div>
-                                </div>
-                                <div className="conversion-item">
-                                    <div className="value blue">{data.currentAnalyze.gourp2Count}</div>
-                                    <div className="label">CRM</div>
-                                    <div className="growth">
-                                        {getGrowthIcon(data.currentAnalyze.group2Growth)}
-                                        <span>유지</span>
-                                    </div>
-                                </div>
-                                <div className="conversion-item">
-                                    <div className="value green">{data.currentAnalyze.gourp3Count}</div>
-                                    <div className="label">TDS</div>
-                                    <div className="growth">
-                                        {getGrowthIcon(data.currentAnalyze.group3Growth)}
-                                        <span>{data.currentAnalyze.group3Growth}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* AI 응원 멘트 */}
-                            <div className="ai-encouragement">
-                                <div className="ai-avatar">🤖</div>
-                                <div className="encouragement-content">
-                                    <div className="encouragement-text">
-                                        "어제보다 더 좋은 성과를 보이고 계시네요! 이런 추세라면 이번 달 목표 달성도 충분히 가능해 보입니다. 파이팅! 💪"
-                                    </div>
-                                    <div className="ai-signature">- AI 어시스턴트</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Vimeo 영상 */}
-                        <div className="kpi-card video-section">
-                            <div className="card-header">
-                                <div className="card-title">
-                                    <MessageSquare className="icon" />
-                                    <span>교육 영상</span>
-                                </div>
-                                <button
-                                    className="more-button"
-                                    onClick={() => window.open('https://www.google.com', '_blank')}
-                                >
-                                    더보기 →
-                                </button>
-                            </div>
-                            <div className="video-container">
-                                <iframe
-                                    src="https://player.vimeo.com/video/998263129?badge=0&autopause=0&player_id=0&app_id=58479"
-                                    width="100%"
-                                    height="260"
-                                    frameBorder="0"
-                                    allow="autoplay; fullscreen; picture-in-picture"
-                                    allowFullScreen
-                                    title="교육 영상"
-                                ></iframe>
-                            </div>
-                            <div className="video-description">
-                                📚 고객 상담 스킬 향상을 위한 실전 교육 영상 - 넛지 기법 활용법
                             </div>
                         </div>
                     </div>
@@ -433,6 +552,119 @@ const Home = () => {
 
                 {/* 하단 상세 정보 */}
                 <div className="detail-grid">
+
+                    {/* AI 피드백 섹션 */}
+                    <div className="feedback-section">
+                        <div className="section-header">
+                            <div className="title-group">
+                                <div className="title-indicator purple"></div>
+                                <h2>AI 피드백</h2>
+                            </div>
+                            <div className="ai-badge">🤖 실시간 분석</div>
+                        </div>
+
+                        <div className="feedback-card">
+                            {/* 피드백 탭 버튼 */}
+                            <div className="feedback-tabs">
+                                <button
+                                    onClick={() => setFeedbackTab('my')}
+                                    className={`feedback-tab ${feedbackTab === 'my' ? 'active' : ''}`}
+                                >
+                                    내 피드백
+                                </button>
+                                <button
+                                    onClick={() => setFeedbackTab('colleagues')}
+                                    className={`feedback-tab ${feedbackTab === 'colleagues' ? 'active' : ''}`}
+                                >
+                                    동료 성공사례
+                                </button>
+                            </div>
+
+                            <div className="feedback-list">
+                                {feedbackTab === 'my' ? (
+                                    // 내 피드백
+                                    data.curnetDatas.length > 0 ? (
+                                        data.curnetDatas.map((item, index) => (
+                                            <div key={item.id} className="feedback-item">
+                                                <div className="feedback-header">
+                                                    <div className="type-info">
+                                                        <span className={`type-indicator ${item.marketingType === 'GIGA 전환' ? 'pink' :
+                                                            item.marketingType === 'CRM 전환' ? 'blue' :
+                                                                'green'
+                                                        }`}></span>
+                                                        <span className="type-name">{item.marketingType}</span>
+                                                    </div>
+                                                    <span className={`status-badge ${item.customerConsentYn === 'Y' ? 'success' : 'warning'
+                                                    }`}>
+                                                        {item.customerConsentYn === 'Y' ? '성공 🎉' : '개선점 💡'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="message">
+                                                    "{item.marketingMessage}"
+                                                </div>
+
+                                                <div className="ai-comment">
+                                                    {item.customerConsentYn === 'Y'
+                                                        ? "완벽한 접근! 고객 니즈 파악이 정확했고 타이밍도 좋았어요. 이런 식으로 계속 하시면 더 좋은 성과를 얻을 수 있을 거예요!"
+                                                        : "좋은 시도! 다음엔 '이런 혜택이 있어서 도움될 것 같아서요'라고 구체적 이유를 제시해보세요."
+                                                    }
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="no-data-message">
+                                            <div className="no-data-icon">📊</div>
+                                            <div className="no-data-text">오늘은 아직 피드백할 데이터가 없네요!</div>
+                                            <div className="no-data-subtext">상담을 진행하시면 AI가 분석해드릴게요.</div>
+                                        </div>
+                                    )
+                                ) : (
+                                    // 동료 성공사례
+                                    data.colleagueSuccessStories.map((story, index) => (
+                                        <div key={story.id} className="feedback-item colleague-story">
+                                            <div className="feedback-header">
+                                                <div className="consultant-info">
+                                                    <div className="consultant-profile">
+                                                        <span className="consultant-name">{story.consultantName}</span>
+                                                        <span className={`consultant-level ${story.consultantLevel.includes('브론즈') ? 'bronze' :
+                                                            story.consultantLevel.includes('실버') ? 'silver' :
+                                                                story.consultantLevel.includes('골드') ? 'gold' :
+                                                                    story.consultantLevel.includes('플래티넘') ? 'platinum' : ''
+                                                        }`}>{story.consultantLevel}</span>
+                                                    </div>
+                                                    <div className="type-info">
+                                                        <span className={`type-indicator ${story.marketingType === 'GIGA 전환' ? 'pink' :
+                                                            story.marketingType === 'CRM 전환' ? 'blue' :
+                                                                'green'
+                                                        }`}></span>
+                                                        <span className="type-name">{story.marketingType}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="story-actions">
+                                                    <button
+                                                        className={`bookmark-btn ${story.bookmarked ? 'bookmarked' : ''}`}
+                                                        onClick={() => toggleBookmark(story.id)}
+                                                    >
+                                                        {story.bookmarked ? '🔖' : '📌'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="message colleague-message">
+                                                "{story.marketingMessage}"
+                                            </div>
+
+                                            <div className="story-tip">
+                                                💡 <strong>성공 포인트:</strong> 구체적인 수치와 고객 맞춤형 혜택을 강조하여 설득력을 높였습니다.
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* 등급 시스템 & 포인트 통합 */}
                     <div className="points-section">
                         <div className="section-header">
@@ -512,7 +744,7 @@ const Home = () => {
                                         <div className="grade-list">
                                             {gradeSystem.map((grade, index) => (
                                                 <div key={grade.name}
-                                                    className={`grade-item ${grade.name === currentGrade.name ? 'active' : ''} ${grade.color}`}>
+                                                     className={`grade-item ${grade.name === currentGrade.name ? 'active' : ''} ${grade.color}`}>
                                                     <div className="grade-info">
                                                         <span className="grade-icon">{grade.icon}</span>
                                                         <span className="grade-name">{grade.name}</span>
@@ -569,118 +801,34 @@ const Home = () => {
                                 </div>
                             </div>
 
-
-                        </div>
-                    </div>
-
-                    {/* AI 피드백 섹션 */}
-                    <div className="feedback-section">
-                        <div className="section-header">
-                            <div className="title-group">
-                                <div className="title-indicator purple"></div>
-                                <h2>AI 피드백</h2>
-                            </div>
-                            <div className="ai-badge">🤖 실시간 분석</div>
-                        </div>
-
-                        <div className="feedback-card">
-                            {/* 피드백 탭 버튼 */}
-                            <div className="feedback-tabs">
-                                <button
-                                    onClick={() => setFeedbackTab('my')}
-                                    className={`feedback-tab ${feedbackTab === 'my' ? 'active' : ''}`}
-                                >
-                                    내 피드백
-                                </button>
-                                <button
-                                    onClick={() => setFeedbackTab('colleagues')}
-                                    className={`feedback-tab ${feedbackTab === 'colleagues' ? 'active' : ''}`}
-                                >
-                                    동료 성공사례
-                                </button>
-                            </div>
-
-                            <div className="feedback-list">
-                                {feedbackTab === 'my' ? (
-                                    // 내 피드백
-                                    data.curnetDatas.length > 0 ? (
-                                        data.curnetDatas.map((item, index) => (
-                                            <div key={item.id} className="feedback-item">
-                                                <div className="feedback-header">
-                                                    <div className="type-info">
-                                                        <span className={`type-indicator ${item.marketingType === 'GIGA 전환' ? 'pink' :
-                                                            item.marketingType === 'CRM 전환' ? 'blue' :
-                                                                'green'
-                                                            }`}></span>
-                                                        <span className="type-name">{item.marketingType}</span>
-                                                    </div>
-                                                    <span className={`status-badge ${item.customerConsentYn === 'Y' ? 'success' : 'warning'
-                                                        }`}>
-                                                        {item.customerConsentYn === 'Y' ? '성공 🎉' : '개선점 💡'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="message">
-                                                    "{item.marketingMessage}"
-                                                </div>
-
-                                                <div className="ai-comment">
-                                                    {item.customerConsentYn === 'Y'
-                                                        ? "완벽한 접근! 고객 니즈 파악이 정확했고 타이밍도 좋았어요. 이런 식으로 계속 하시면 더 좋은 성과를 얻을 수 있을 거예요!"
-                                                        : "좋은 시도! 다음엔 '이런 혜택이 있어서 도움될 것 같아서요'라고 구체적 이유를 제시해보세요."
-                                                    }
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="no-data-message">
-                                            <div className="no-data-icon">📊</div>
-                                            <div className="no-data-text">오늘은 아직 피드백할 데이터가 없네요!</div>
-                                            <div className="no-data-subtext">상담을 진행하시면 AI가 분석해드릴게요.</div>
-                                        </div>
-                                    )
-                                ) : (
-                                    // 동료 성공사례
-                                    data.colleagueSuccessStories.map((story, index) => (
-                                        <div key={story.id} className="feedback-item colleague-story">
-                                            <div className="feedback-header">
-                                                <div className="consultant-info">
-                                                    <div className="consultant-profile">
-                                                        <span className="consultant-name">{story.consultantName}</span>
-                                                        <span className={`consultant-level ${story.consultantLevel.includes('브론즈') ? 'bronze' :
-                                                            story.consultantLevel.includes('실버') ? 'silver' :
-                                                                story.consultantLevel.includes('골드') ? 'gold' :
-                                                                    story.consultantLevel.includes('플래티넘') ? 'platinum' : ''
-                                                            }`}>{story.consultantLevel}</span>
-                                                    </div>
-                                                    <div className="type-info">
-                                                        <span className={`type-indicator ${story.marketingType === 'GIGA 전환' ? 'pink' :
-                                                            story.marketingType === 'CRM 전환' ? 'blue' :
-                                                                'green'
-                                                            }`}></span>
-                                                        <span className="type-name">{story.marketingType}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="story-actions">
-                                                    <button
-                                                        className={`bookmark-btn ${story.bookmarked ? 'bookmarked' : ''}`}
-                                                        onClick={() => toggleBookmark(story.id)}
-                                                    >
-                                                        {story.bookmarked ? '🔖' : '📌'}
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <div className="message colleague-message">
-                                                "{story.marketingMessage}"
-                                            </div>
-
-                                            <div className="story-tip">
-                                                💡 <strong>성공 포인트:</strong> 구체적인 수치와 고객 맞춤형 혜택을 강조하여 설득력을 높였습니다.
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
+                            {/* 교육 영상 카드 추가 */}
+                            <div className="education-video-card">
+                                <div className="video-header">
+                                    <div className="video-title">
+                                        <MessageSquare className="icon" />
+                                        <span>교육 영상</span>
+                                    </div>
+                                    <button
+                                        className="more-button"
+                                        onClick={() => window.open('https://www.google.com', '_blank')}
+                                    >
+                                        더보기 →
+                                    </button>
+                                </div>
+                                <div className="video-container">
+                                    <iframe
+                                        src="https://player.vimeo.com/video/998263129?badge=0&autopause=0&player_id=0&app_id=58479"
+                                        width="100%"
+                                        height="200"
+                                        frameBorder="0"
+                                        allow="autoplay; fullscreen; picture-in-picture"
+                                        allowFullScreen
+                                        title="교육 영상"
+                                    ></iframe>
+                                </div>
+                                <div className="video-description">
+                                    📚 고객 상담 스킬 향상을 위한 실전 교육 영상 - 넛지 기법 활용법
+                                </div>
                             </div>
                         </div>
                     </div>
